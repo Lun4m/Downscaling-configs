@@ -1,0 +1,246 @@
+format: zarr
+frequency: 3h
+timestep: ${data.frequency}
+
+in_lres_variables:
+  - 100u
+  - 100v
+  - 10u
+  - 10v
+  - 2d
+  - 2t
+  - cp
+  - hcc
+  - lcc
+  - mcc
+  - msl
+  - q_1000
+  - q_925
+  - q_850
+  - q_700
+  - q_600
+  - q_500
+  - ro
+  - sdor
+  - sf
+  - skt
+  - slor
+  - sp
+  - ssrd
+  - stl1
+  - stl2
+  - strd
+  - swvl1
+  - swvl2
+  - t_1000
+  - t_925
+  - t_850
+  - t_700
+  - t_600
+  - t_500
+  - tcc
+  - tcw
+  - tp
+  - u_1000
+  - u_925
+  - u_850
+  - u_700
+  - u_600
+  - u_500
+  - v_1000
+  - v_925
+  - v_850
+  - v_700
+  - v_600
+  - v_500
+  - w_1000
+  - w_925
+  - w_850
+  - w_700
+  - w_600
+  - w_500
+  - z_1000
+  - z_925
+  - z_850
+  - z_700
+  - z_600
+  - z_500
+  - z
+forcing:
+  - cos_latitude
+  - cos_longitude
+  - sin_latitude
+  - sin_longitude
+  - cos_julian_day
+  - cos_local_time
+  - sin_julian_day
+  - sin_local_time
+  - insolation
+  - lsm
+  - orog
+out_hres_variables:
+  - 10u
+  - 10v
+  - 100u
+  - 100v
+  - 2d
+  - 2t
+  - mn2t
+  - msl
+  - mx2t
+  - sp
+  - ssrd
+  - strd
+  - tcc
+  - tciwv
+  - tp
+residual_fields:
+  - 10u
+  - 10v
+  - 100u
+  - 100v
+  - 2d
+  - 2t
+  - msl
+  - sp
+  - strd
+direct_prediction_fields:
+  - mn2t
+  - mx2t
+  - ssrd
+  - tp
+  - tcc
+  - tciwv
+
+diagnostic: []
+num_features: null
+
+normalizer:
+  default: mean-std
+  none:
+    - cos_latitude
+    - cos_longitude
+    - sin_latitude
+    - sin_longitude
+    - cos_julian_day
+    - cos_local_time
+    - sin_julian_day
+    - sin_local_time
+    - insolation
+    - lsm
+    - hcc
+    - lcc
+    - mcc
+  max:
+    - orog
+    - z_1000
+    - z_925
+    - z_850
+    - z_700
+    - z_600
+    - z_500
+    - z
+  min-max: [tp, ssrd, tcc]
+
+remapper_boxcox_tp:
+  _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
+  _convert_: all
+  config:
+    default: "none"
+    power: [tp]
+    method_kwargs:
+      power:
+        lambd: 0.33 
+        tangent_linear_above_one: true
+        clip_negative: True
+
+remapper_affine_tp:
+  _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
+  _convert_: all
+  config:
+    default: "none"
+    affine: [tp]
+    method_kwargs:
+      affine:
+        scale: 10
+
+remapper_displace_boundary_atoms_tp:
+  _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
+  _convert_: all
+  config:
+    displace_boundary_atoms: ["tp"]
+    method_kwargs:
+      displace_boundary_atoms:
+        lower_atom: 0
+        lower_target: -1
+        eps: 1e-7
+
+remapper_boxcox_ssrd:
+  _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
+  _convert_: all
+  config:
+    default: "none"
+    power: [ssrd]
+    method_kwargs:
+      power:
+        lambd: 0.5
+        tangent_linear_above_one: true
+        clip_negative: True
+
+remapper_affine_ssrd:
+  _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
+  _convert_: all
+  config:
+    default: "none"
+    affine: [ssrd]
+    method_kwargs:
+      affine:
+        scale: 3
+
+remapper_displace_boundary_atoms_ssrd:
+  _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
+  _convert_: all
+  config:
+    displace_boundary_atoms: ["ssrd"]
+    method_kwargs:
+      displace_boundary_atoms:
+        lower_atom: 0
+        lower_target: -1
+        eps: 1e-7
+
+remapper_atanh_tcc:
+  _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
+  _convert_: all
+  config:
+    default: "none"
+    atanh: [tcc]
+    method_kwargs:
+      atanh:
+        rho: 3.0
+
+remapper_displace_boundary_atoms_tcc:
+  _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
+  _convert_: all
+  config:
+    displace_boundary_atoms: ["tcc"]
+    method_kwargs:
+      displace_boundary_atoms:
+        lower_atom: -1
+        lower_target: -1.5
+        upper_atom: 1
+        upper_target: 1.5
+        eps: 1e-4
+
+processors:
+  normalizer:
+    _target_: anemoi.models.preprocessing.multi_dataset_normalizer.TopNormalizer
+    _convert_: all
+    config: ${data.normalizer}
+  remapper_1: ${data.remapper_boxcox_tp}
+  remapper_2: ${data.remapper_affine_tp}
+  remapper_3: ${data.remapper_displace_boundary_atoms_tp}
+  remapper_4: ${data.remapper_boxcox_ssrd}
+  remapper_5: ${data.remapper_affine_ssrd}
+  remapper_6: ${data.remapper_displace_boundary_atoms_ssrd}
+  remapper_7: ${data.remapper_atanh_tcc}
+  remapper_8: ${data.remapper_displace_boundary_atoms_tcc}

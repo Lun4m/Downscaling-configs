@@ -1,0 +1,49 @@
+enable_checkpointing: True
+check_val_every_n_epoch: 3
+profiler: False
+enable_progress_bar: True
+print_memory_summary: False
+callbacks: []
+
+checkpoint:
+  every_n_minutes:
+    save_frequency: 30
+    num_models_saved: 3
+
+  every_n_epochs:
+    save_frequency: 1
+    num_models_saved: -1
+
+  every_n_train_steps:
+    save_frequency: null
+    num_models_saved: 0
+
+log:
+  interval: 60
+  mlflow:
+    project_name: 'caerra-ds'
+    experiment_name: 'caerra-ds'
+    run_name: ${name}
+    enabled: True
+    offline: False
+    system: True
+    authentication: True
+    on_resume_create_child: True
+    tracking_uri: https://mlflow.ecmwf.int
+    log_model: False
+    terminal: False
+    expand_hyperparams:
+      - config
+    http_max_retries: 35
+    max_params_length: 2000
+  wandb:
+    enabled: False
+  tensorboard:
+    enabled: False
+
+plot:
+  enabled: False
+  callbacks: []
+
+debug:
+  anomaly_detection: False

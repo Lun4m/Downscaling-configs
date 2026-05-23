@@ -1,0 +1,64 @@
+name: core-ref-10
+overwrite: False
+data: data
+hidden: hidden
+lres: lres
+
+nodes:
+  lres:
+    node_builder:
+      _target_: anemoi.graphs.nodes.AnemoiDatasetNodes
+      dataset: ${hardware.paths.data}/${hardware.files.dataset_x}
+    attributes: ${graph.attributes.nodes}
+
+  data:
+    node_builder:
+      _target_: anemoi.graphs.nodes.AnemoiDatasetNodes
+      dataset: ${hardware.paths.data}/${hardware.files.dataset_y}
+    attributes: ${graph.attributes.nodes}
+
+  hidden:
+    node_builder:
+      _target_: anemoi.graphs.nodes.LimitedAreaTriNodes
+      resolution: 10
+      # TODO: double check that this margin does not produce isolated nodes
+      margin_radius_km: 6
+      reference_node_name: data
+    attributes: ${graph.attributes.nodes}
+
+edges:
+  - source_name: data
+    target_name: hidden
+    edge_builders:
+      - _target_: anemoi.graphs.edges.ReversedKNNEdges
+        num_nearest_neighbours: 3
+    attributes: ${graph.attributes.edges}
+
+  - source_name: hidden
+    target_name: hidden
+    edge_builders:
+      - _target_: anemoi.graphs.edges.MultiScaleEdges
+        x_hops: 1
+        scale_resolutions: ${graph.nodes.hidden.node_builder.resolution}
+    attributes: ${graph.attributes.edges}
+
+  - source_name: hidden
+    target_name: data
+    edge_builders:
+      - _target_: anemoi.graphs.edges.KNNEdges
+        num_nearest_neighbours: 3
+    attributes: ${graph.attributes.edges}
+
+attributes:
+  nodes:
+    area_weight:
+      _target_: anemoi.graphs.nodes.attributes.UniformWeights
+      norm: unit-max
+
+  edges:
+    edge_length:
+      _target_: anemoi.graphs.edges.attributes.EdgeLength
+      norm: unit-std
+    edge_dirs:
+      _target_: anemoi.graphs.edges.attributes.EdgeDirection
+      norm: unit-std

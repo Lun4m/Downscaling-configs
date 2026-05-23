@@ -1,0 +1,14 @@
+scratch: ${oc.decode:${oc.env:SCRATCH}}
+data: ${hardware.paths.scratch}/anemoi-datasets
+output: ${hardware.paths.scratch}/experiments/${hardware.region}
+graph: ${hardware.paths.scratch}/graphs/${hardware.region}
+truncation: ${hardware.paths.scratch}/interp-matrices/${hardware.region}
+residual_statistics: ${hardware.paths.scratch}/residual-stats/${hardware.region}
+checkpoints: ${hardware.paths.output}/checkpoint
+plots: ${hardware.paths.output}/plots
+profiler: ${hardware.paths.output}/profiler
+logs:
+  base: ${hardware.paths.output}/logs
+  wandb: ${hardware.paths.logs.base}/wandb
+  mlflow: ${hardware.paths.logs.base}/mlflow
+  tensorboard: ${hardware.paths.logs.base}/tensorboard

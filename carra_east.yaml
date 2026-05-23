@@ -1,0 +1,18 @@
+defaults:
+  - data: carra
+  - dataloader: carra
+  - datamodule: downscaling
+  - diagnostics: downscaling
+  - graph: carra
+  - hardware: carra_east
+  - model: carra
+  - training: downscaling
+
+name: carra-east-oslo
+description: carra-east-oslo
+config_validation: False
+
+training:
+  # Approx 20 days at 0.12 and 128 batch size
+  # Around 20 M samples
+  max_steps: 160_000

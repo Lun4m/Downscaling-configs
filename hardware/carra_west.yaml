@@ -1,0 +1,23 @@
+defaults:
+  - paths: downscaling
+
+accelerator: auto
+num_gpus_per_node: ${oc.decode:${oc.env:SLURM_GPUS_PER_NODE}}
+num_nodes: ${oc.decode:${oc.env:SLURM_NNODES}}
+num_gpus_per_model: 1
+
+region: carra-west
+
+files:
+  dataset_x: era-accumulated/caerraml-ea-an-oper-atos-n320crop2carrawest-1991-2023-3h-v2-accum.zarr
+  dataset_y: ${hardware.region}/carra-west-rr-an-oper-no-ar-cw-mars-2p5km-1991-2024-3h-v4.zarr
+  dataset_y_forcings: ${hardware.region}/carra-west-rr-an-oper-no-ar-cw-mars-2p5km-1991-2024-3h-v4.zarr
+  warm_start: null
+  graph: core-ref-10.pt
+  residual_statistics: residual_stats.npy
+  truncation: interp_matrix.npz
+  truncation_inv:
+  checkpoint:
+    every_n_epochs: anemoi-by_epoch-epoch_{epoch:03d}-step_{step:06d}
+    every_n_train_steps: anemoi-by_step-epoch_{epoch:03d}-step_{step:06d}
+    every_n_minutes: anemoi-by_time-epoch_{epoch:03d}-step_{step:06d}

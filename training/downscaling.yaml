@@ -1,0 +1,85 @@
+max_epochs: null
+max_steps: null
+
+# Deprecated
+predict_residuals: False
+# For debug only, slows down training
+deterministic: False
+
+precision: bf16-mixed
+multistep_input: 1
+accum_grad_batches: 1
+zero_optimizer: False # use ZeroRedundancyOptimizer ; saves memory for larger models
+loss_gradient_scaling: False
+run_id: null
+fork_run_id: null
+transfer_learning: False # activate to perform transfer learning
+load_weights_only: False # only load model weights, do not restore optimiser states etc.
+
+num_sanity_val_steps: 4
+metrics: ${data.out_hres_variables}
+
+model_task: anemoi.training.train.tasks.GraphDiffusionDownscaler
+training_approach: probabilistic_low_noise # probabilistic_high_noise
+
+training_loss:
+  _target_: anemoi.training.losses.WeightedMSELoss
+  scalers: ['general_variable', 'node_weights']
+
+validation_metrics:
+  mse:
+    _target_: anemoi.training.losses.WeightedMSELoss
+    scalers: ['node_weights'] # Cannot scale over the variable dimension due to possible remappings.
+
+strategy:
+  _target_: anemoi.training.distributed.strategy.DDPGroupStrategy
+  num_gpus_per_model: ${hardware.num_gpus_per_model}
+  read_group_size: ${dataloader.read_group_size}
+
+lr:
+  warmup: 200
+  rate: 2e-5
+  iterations: ${training.max_steps}
+  min: 1e-7
+
+rollout:
+  start: 1
+  epoch_increment: 0 # increase rollout every n epochs
+  max: 1
+
+scalers:
+  general_variable:
+    _target_: anemoi.training.losses.scalers.GeneralVariableLossScaler
+    weights:
+      default: 1
+      2t: 2
+      tp: 2
+      10u: 1.5
+      10v: 1.5
+
+  node_weights: # Scalers from node attributes
+    _target_: anemoi.training.losses.scalers.GraphNodeAttributeScaler
+    nodes_name: ${graph.data}
+    nodes_attribute_name: area_weight
+    norm: unit-sum
+
+variable_groups:
+  default: sfc
+
+# Clip gradients, 0 : don't clip, default algorithm: norm, alternative: value
+gradient_clip:
+  val: 1.
+  algorithm: norm
+
+# Stochastic weight averaging (https://pytorch.org/blog/stochastic-weight-averaging-in-pytorch/)
+swa:
+  enabled: False
+  lr: 1.e-4
+
+# Optimizer settings
+optimizer:
+  zero: False
+  kwargs:
+    weight_decay: 0.1
+    betas: [0.9, 0.95]
+    eps: 1e-7
