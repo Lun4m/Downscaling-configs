@@ -1,4 +1,4 @@
-prefetch_factor: 2
+prefetch_factor: 1
 pin_memory: True
 
 read_group_size: ${hardware.num_gpus_per_model}
