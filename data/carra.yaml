@@ -133,12 +133,6 @@ normalizer:
     - mcc
   max:
     - orog
-    - z_1000
-    - z_925
-    - z_850
-    - z_700
-    - z_600
-    - z_500
     - z
   min-max: [tp, ssrd, tcc]
 
