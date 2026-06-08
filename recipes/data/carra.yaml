@@ -1,7 +1,6 @@
 format: zarr
 frequency: 3h
 timestep: ${data.frequency}
-
 in_lres_variables:
   - 100u
   - 100v
@@ -111,10 +110,8 @@ direct_prediction_fields:
   - tp
   - tcc
   - tciwv
-
 diagnostic: []
 num_features: null
-
 normalizer:
   default: mean-std
   none:
@@ -135,7 +132,6 @@ normalizer:
     - orog
     - z
   min-max: [tp, ssrd, tcc]
-
 remapper_boxcox_tp:
   _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
   _convert_: all
@@ -144,10 +140,9 @@ remapper_boxcox_tp:
     power: [tp]
     method_kwargs:
       power:
-        lambd: 0.33 
+        lambd: 0.33
         tangent_linear_above_one: true
         clip_negative: True
-
 remapper_affine_tp:
   _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
   _convert_: all
@@ -157,7 +152,6 @@ remapper_affine_tp:
     method_kwargs:
       affine:
         scale: 10
-
 remapper_displace_boundary_atoms_tp:
   _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
   _convert_: all
@@ -168,7 +162,6 @@ remapper_displace_boundary_atoms_tp:
         lower_atom: 0
         lower_target: -1
         eps: 1e-7
-
 remapper_boxcox_ssrd:
   _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
   _convert_: all
@@ -180,7 +173,6 @@ remapper_boxcox_ssrd:
         lambd: 0.5
         tangent_linear_above_one: true
         clip_negative: True
-
 remapper_affine_ssrd:
   _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
   _convert_: all
@@ -190,7 +182,6 @@ remapper_affine_ssrd:
     method_kwargs:
       affine:
         scale: 3
-
 remapper_displace_boundary_atoms_ssrd:
   _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
   _convert_: all
@@ -201,7 +192,6 @@ remapper_displace_boundary_atoms_ssrd:
         lower_atom: 0
         lower_target: -1
         eps: 1e-7
-
 remapper_atanh_tcc:
   _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
   _convert_: all
@@ -211,7 +201,6 @@ remapper_atanh_tcc:
     method_kwargs:
       atanh:
         rho: 3.0
-
 remapper_displace_boundary_atoms_tcc:
   _target_: anemoi.models.preprocessing.ds_remapper.TopRemapper
   _convert_: all
@@ -224,7 +213,6 @@ remapper_displace_boundary_atoms_tcc:
         upper_atom: 1
         upper_target: 1.5
         eps: 1e-4
-
 processors:
   normalizer:
     _target_: anemoi.models.preprocessing.multi_dataset_normalizer.TopNormalizer

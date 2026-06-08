@@ -1,6 +1,6 @@
 prefetch_factor: 1
 pin_memory: True
-
+ 
 read_group_size: ${hardware.num_gpus_per_model}
 select_in: ${data.in_lres_variables}
 select_in_hres: ${data.forcing}
