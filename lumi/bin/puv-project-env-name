@@ -1,0 +1,29 @@
+#!/bin/bash
+# Return the name of the venv
+# This returns the content of $(puv-project-path)/.venv-name
+# If the file does not exist, it will create it with the name of the folder
+# and a hash.
+# If you want to share venv between projects, set the content of the .venv-name
+# to the same value for each project.
+set -eo pipefail
+
+project_path=${1:-$(puv-project-path)}
+if [ -z $project_path ]; then
+    return 1
+fi
+venv_name_path="$project_path/.venv-name"
+if [ -f $venv_name_path ]; then
+    cat "$project_path/.venv-name"
+else
+    # If .venv-name file doesn't exist, we create it.
+    # The venv name is the current folder
+    venv_name=${project_path##*/}
+    venv_name=${venv_name:-/}
+    # Use a hash in case several projects share the same name.
+    # If you want to share a virtualenv (bad idea!) set the same values
+    # in the .venv-name file in both project.
+    hashval=$(date | sha256sum)
+    echo $venv_name-${hashval:0:10} > $venv_name_path
+    echo $venv_name-${hashval:0:10}
+fi
+

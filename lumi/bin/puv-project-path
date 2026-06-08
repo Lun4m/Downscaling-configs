@@ -1,0 +1,20 @@
+#!/bin/bash
+# Finds the base path of the project.
+# This does a reverse walk to find the first folder with a pyproject.toml file
+# and set this as the project path
+set -eo pipefail
+
+prev="./"
+full_path=$(readlink -f $prev)
+while [ $full_path != "/" ] ; do
+    out=$(find $prev -maxdepth 1 -name "pyproject.toml" -print -quit)
+    if [ -z $out ]; then
+        prev="$prev../"
+        full_path=$(readlink -f $prev)
+    else
+        echo $full_path
+        exit 0
+    fi
+done
+exit 1
+

@@ -1,0 +1,245 @@
+#!/usr/bin/bash
+# Build your Python environment to run Anemoi on LUMI
+# You need to run this in a folder with a uv project.
+# You can check this running `puv-project-path`. It should resolve to your project path.
+
+set -eo pipefail
+
+module load LUMI/25.03
+# Load cray-python to get python3.11 (for puv-get-config)
+module load cray-python
+
+#needed for WITH_CONDA
+module use /appl/local/laifs/modules
+module load lumi-aif-singularity-bindings
+
+if [ ! -v VENV_NAME ] && [ ! -v SUV_VENV_LOCATION ]; then
+    echo "Either \$VENV_NAME or \$SUV_VENV_LOCATION should be defined."
+    exit 1
+fi
+
+echo "$VENV_NAME"
+echo "$SUV_VENV_LOCATION"
+
+if [ ! -v VENV_NAME ] && [ -v SUV_VENV_LOCATION ]; then
+    VENV_NAME="$SUV_VENV_LOCATION/$(puv-project-env-name)"
+fi
+
+CURRENT_SETTINGS="Current settings:
+           VENV_NAME=$VENV_NAME
+           SUV_VENV_LOCATION=$SUV_VENV_LOCATION
+           CONTAINERS_DIR=$CONTAINERS_DIR"
+
+DOCSTRING="Build your Python environment to run Anemoi on LUMI.
+
+    The environment name is taken from pyproject.toml [tool.suv.venv-name]. 
+
+Usage:
+    build-lumi-venv [SIF_PATH] [--overrides OVERRIDES] [--help]
+
+Argument:
+Optional Arguments:
+ * SIF_PATH: path to the sigularity image to use. (otherwise taken from pyproject.toml [tool.suv.sif], relative to \$CONTAINERS_DIR if defined)
+ * --overrides OVERRIDES: Force the given comma-separated packages from the base environment in the singularity image to be reinstalled (e.g. 'numpy,zarr'). Overrides can also be set in pyproject.toml [tool.suv.overrides].
+ * --rebuild or -r: Rebuilds the environment.
+ * --help or -h: Display this help message."
+
+overrides=()
+next_override=false
+has_overrides=false
+cli_overrides=false
+rebuild=false
+sif_img=""
+config_sif_path=""
+
+k=0
+for arg in "$@"; do
+    k=$(($k + 1))
+    if [ "$arg" = "-h" ] || [ "$arg" = "--help" ]; then
+        printf "$DOCSTRING\n\n$CURRENT_SETTINGS\n"
+        exit 0
+    elif [ "$arg" = "--rebuild" ] || [ "$arg" = "-r" ]; then
+        rebuild=true
+    elif [ "$arg" = "--overrides" ]; then
+        next_override=true
+        has_overrides=true
+        cli_overrides=true
+        continue
+    elif [ $k -eq 1 ]; then
+        # why are w enot wriing it to CURRENT_SETTINGS imediatelyl for debuggin purposes?
+        sif_img="$arg"
+    elif [ "$next_override" = true ] && [ "$arg" != "" ]; then
+        overrides_raw="$arg"
+        IFS=', ' read -r -a overrides <<<"$arg"
+    elif [ "$next_override" = false ]; then
+        echo "Unknown argument $arg."
+        exit 1
+    fi
+    next_override=false
+done
+
+config_sif_path="$(puv-get-config tool.suv.sif 2>/dev/null || true)"
+
+# 1. Read Config Overrides
+config_overrides="$(puv-get-config tool.suv.overrides 2>/dev/null || true)"
+if [ -n "$config_overrides" ]; then
+    IFS=',' read -r -a config_overrides_arr <<<"$config_overrides"
+    for i in "${!config_overrides_arr[@]}"; do
+        # Trim whitespace and add to main overrides list
+        overrides+=("${config_overrides_arr[$i]//[[:space:]]/}")
+    done
+fi
+
+# 2. Deduplicate Overrides (Union of CLI + Config)
+if [ ${#overrides[@]} -gt 0 ]; then
+    # Sort unique
+    IFS=$'\n' sorted_overrides=($(printf "%s\n" "${overrides[@]}" | sort -u))
+    unset IFS
+    overrides=("${sorted_overrides[@]}")
+    has_overrides=true
+fi
+
+# 3. Compare against previous build record
+overrides_txt_raw=""
+if [ -f "$VENV_NAME/overrides.txt" ]; then
+    overrides_txt_raw=$(cat "$VENV_NAME/overrides.txt")
+fi
+
+# Compare whitespace-normalized strings
+current_overrides_str=$(echo "${overrides[*]}" | tr -s ' ')
+previous_overrides_str=$(echo "$overrides_txt_raw" | tr '\n' ' ' | tr -s ' ')
+# Trim trailing spaces
+current_overrides_str="${current_overrides_str%"${current_overrides_str##*[![:space:]]}"}"
+previous_overrides_str="${previous_overrides_str%"${previous_overrides_str##*[![:space:]]}"}"
+
+if [ "$current_overrides_str" != "$previous_overrides_str" ]; then
+    if [ -n "$previous_overrides_str" ] || [ -n "$current_overrides_str" ]; then
+        echo "Using new overrides (differ from previous build):" >&2
+        echo "  Previous: [ $previous_overrides_str ]" >&2
+        echo "  New:      [ $current_overrides_str ]" >&2
+    fi
+fi
+
+if [ -z "$sif_img" ] && [ -n "$config_sif_path" ]; then
+    sif_img="$config_sif_path"
+fi
+if [[ -n "${CONTAINERS_DIR:-}" && "$sif_img" != */* && ! -f "$sif_img" ]]; then
+    sif_img="$CONTAINERS_DIR/$sif_img"
+fi
+
+num_overrides=${#overrides[@]}
+
+if [ "$rebuild" = false ] && [ -f "$VENV_NAME/venv.sqfs" ]; then
+    read -e -p "$VENV_NAME/venv.sqfs already exists. Overwrite? [yes/No] " choice
+    if [[ "$choice" != [Yy]* ]]; then
+        echo "Exiting."
+        exit 0
+    fi
+fi
+rm -f "$VENV_NAME/venv.sqfs"
+
+if [ -z "$sif_img" ]; then
+    echo "No image provided: pass SIF_PATH as an argument or set tool.suv.sif in pyproject.toml." >&2
+    # If we had a configured path that looked like a basename, and CONTAINERS_DIR was missing
+    if [ -n "$config_sif_path" ] && [[ "$config_sif_path" != */* ]] && [ -z "${CONTAINERS_DIR:-}" ]; then
+        echo "Hint: tool.suv.sif '$config_sif_path' appears to be a basename, but \$CONTAINERS_DIR is not set." >&2
+    fi
+    exit 1
+fi
+
+num_overrides=${#overrides[@]}
+
+if [ "$has_overrides" = true ]; then
+    CURRENT_SETTINGS="$CURRENT_SETTINGS
+           OVERRIDES=${overrides[*]}"
+fi
+if [ -n "$sif_img" ]; then
+    CURRENT_SETTINGS="$CURRENT_SETTINGS
+           SIF_PATH=$sif_img"
+fi
+printf "$CURRENT_SETTINGS\n"
+
+if [ "$cli_overrides" = true ]; then
+    echo "WARNING: Using CLI overrides; add them to pyproject.toml [tool.suv.overrides] for reproducibility." >&2
+fi
+
+sif_path=$(readlink -f "$sif_img")
+
+command="$(basename "$0") '$sif_path'"
+if [ "$num_overrides" -ne 0 ]; then
+    overrides_str=$(printf "%s," "${overrides[@]}")
+    command="$command --overrides '$overrides_str'"
+fi
+
+if [ "$num_overrides" -ne 0 ]; then
+    override_pattern=$(
+        IFS="|"
+        echo "^(${overrides[*]})=="
+    )
+    override_str=$(printf "%s\n" "${overrides[@]}")
+else
+    override_pattern="^$" # match nothing
+    override_str=""
+fi
+
+# Cache optional, not used by default, set below in container
+cache_bind=""
+cache_env=""
+if [[ -n "${UV_CACHE_DIR:-}" ]]; then
+    cache_bind=",$UV_CACHE_DIR:/uv-cache"
+    cache_env='export UV_CACHE_DIR="/uv-cache"'
+fi
+
+choice="N"
+if [ -d "$VENV_NAME/venv" ] && [ "$rebuild" = false ]; then
+    read -e -p "$VENV_NAME/venv already exists. Rebuild? [yes/No] " choice
+fi
+if [ ! -d "$VENV_NAME/venv" ] || [[ "$choice" == [Yy]* ]]; then
+    echo "Mounting folder $VENV_NAME as /user-software in container..."
+    rm -rf "$VENV_NAME/venv"
+    mkdir -p "$VENV_NAME/venv"
+    singularity exec -B "$VENV_NAME/venv:/user-software,$VENV_NAME:/user-software-parent${cache_bind}" "$sif_path" bash <<EOF
+set -eo pipefail
+
+\$WITH_CONDA
+
+# Ensure user local bin is in PATH (where uv lives)
+export PATH="\$HOME/.local/bin:\$PATH"
+
+export UV_NO_CACHE=1  # If you want to set the cache (set this to 0), you need to set UV_CACHE_DIR first
+export UV_LINK_MODE="copy"
+$cache_env
+export UV_FROZEN=1
+export UV_NO_SYNC=1
+echo "$sif_path" > /user-software-parent/sif.txt
+echo "$command" > /user-software-parent/command.txt
+
+echo "Creating virtual environment..."
+# Cannot use uv venv --system-site-packages to allow fetching
+python -m venv --system-site-packages "/user-software"
+pip list --format='freeze' | grep -Ev "$override_pattern" > /user-software-parent/constraints.txt
+cat /user-software-parent/constraints.txt | sed 's/$/ ; sys_platform == "never"/' > /user-software-parent/skipped.txt
+echo "$override_str" > /user-software-parent/overrides.txt
+source "/user-software/bin/activate"
+
+cat "pyproject.toml" > /user-software-parent/pyproject.toml
+
+echo "Checking dependencies..."
+uv pip compile "pyproject.toml" -c "/user-software-parent/constraints.txt" --overrides "/user-software-parent/skipped.txt" -o "/user-software-parent/requirements.txt"
+
+echo "Installing dependencies..."
+uv pip install -r "pyproject.toml" -c "/user-software-parent/constraints.txt" --overrides "/user-software-parent/skipped.txt"
+EOF
+fi
+
+# Copy the compiled requirements back to the project root for version control
+if [ -f "$VENV_NAME/requirements.txt" ]; then
+    echo "Copying compiled requirements to ./requirements.txt"
+    cp "$VENV_NAME/requirements.txt" "./requirements.txt"
+fi
+
+echo "Making squashfs with environment"
+mksquashfs "$VENV_NAME/venv" "$VENV_NAME/venv.sqfs" 2>"$VENV_NAME"/mksquashfs.err
+
+echo "Removing original environment at $VENV_NAME/venv"
+rm -rf "$VENV_NAME/venv"

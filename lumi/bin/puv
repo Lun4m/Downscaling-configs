@@ -1,0 +1,38 @@
+#!/bin/bash
+# Patch uv commands to automatically use the correct virtual environment
+# It is equivalent to:
+# `UV_PROJECT_ENVIRONMENT=$PUV_VENV_LOCATION/project-name uv $@`
+# Note that in $PUV_VENV_LOCATION is not set, this will act as regular uv commands
+# Also note that if UV_PROJECT_ENVIRONMENT is already set, this will not try to change
+# it.
+# This works for any uv environment. (Start by doing uv init).
+set -eo pipefail
+
+if [ -d "/projappl/project_465002082" ]; then  # there's probably a better way
+    # To make sure people don't use puv on lumi
+    echo "On LUMI, use suv instead of puv!"
+    exit 1
+fi
+
+puv_cmds=("run" "add" "remove" "version" "sync" "lock" "export" "tree" "pip")
+
+function is_in () {
+    local needle="$1"
+    shift
+    local haystack=("$@")
+    for cmd in "${haystack[@]}"; do
+        if [ "$needle" == "$cmd" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+if ! is_in "$1" "${puv_cmds[@]}" || [ ! -v PUV_VENV_LOCATION ] || [ -v UV_PROJECT_ENVIRONMENT ]; then
+    uv "$@"
+    exit 0
+fi
+
+project_path=$(puv-project-path) &&
+UV_PROJECT_ENVIRONMENT="$PUV_VENV_LOCATION/$(puv-project-env-name $project_path)" uv "$@"
+

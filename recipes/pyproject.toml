@@ -1,0 +1,67 @@
+[project]
+name = "CARRA-downscaling"
+description = "Environment for training a downscaling model on CARRA data on LUMI with AIF torch "
+version = "0.1.0"
+requires-python = ">=3.12, <3.13"
+
+dependencies = [
+    # Container-owned base stack (reference only; not installed by uv here):
+    # torch==2.10.0+rocm7.0.lumi.aif.20260415153022
+    # torchvision==0.25.0+rocm7.0
+    # triton==3.6.0
+    # torch-geometric==2.7.0
+    # pytorch-triton-rocm==3.6.0
+    # pytorch-lightning==2.5.5
+    # pyyaml==6.0.2
+    # pydantic==2.9
+    # numpy==2.2.6
+    "anemoi-training",
+    "anemoi-models[migrations]",
+    "anemoi-graphs[tri]",
+    "anemoi-datasets[create]",
+    "anemoi-transform",
+    "anemoi-registry==0.2.2",
+    "anemoi-inference",
+    "anemoi-utils", 
+    "mlflow-export-import",
+    "zarr<=2.18.4",
+    "obstore",
+    "wonderwords",
+    "pyrsmi",
+    "pyproj",
+    "icecream",
+    "tabulate",
+]
+
+[tool.uv.sources]
+# Need to specify the relative path
+anemoi-graphs = { path = "anemoi-core/graphs", editable = true }
+anemoi-models = { path = "anemoi-core/models", editable = true }
+anemoi-training = { path = "anemoi-core/training", editable = true }
+anemoi-inference = { path = "anemoi-inference", editable = true }
+
+mlflow-export-import = { git = "https://github.com/mlflow/mlflow-export-import" }
+torch = [
+  { index = "pytorch-rocm", marker = "sys_platform == 'linux' or sys_platform == 'manylinux'"},
+]
+torchvision = [
+  { index = "pytorch-rocm", marker = "sys_platform == 'linux' or sys_platform == 'manylinux'" },
+]
+pytorch-triton-rocm = [
+  { index = "pytorch-rocm", marker = "sys_platform == 'linux' or sys_platform == 'manylinux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm7.0"
+explicit = true
+
+[tool.uv]
+environments = ["sys_platform == 'linux' or sys_platform == 'manylinux'"]
+package = false
+
+[tool.suv]
+venv-name="torch_210"
+overrides = ["numpy"] # clash with anemoi-training numpy
+path-bindings = "/scratch:/scratch,/pfs:/pfs"
+sif="pytorch-2.10.0-pyg-rocm-7.0.0-py-3.12.3_v1.1.sif"

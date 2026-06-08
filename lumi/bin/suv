@@ -1,0 +1,89 @@
+#!/bin/bash
+# Singularity uv (not sport utility vehicule)
+# This runs a singularity image stored in $SIF
+# It will look for an environment built with build-lumi-venv in $SQFS.
+set -eo pipefail
+
+singularity_cmds=("run" "version" "export" "pip")
+forbidden_cmds=("add" "remove" "sync" "lock")
+
+# Load cray-python to get python3.11 (for puv-get-config)
+if command -v module >/dev/null 2>&1; then
+    module load cray-python >/dev/null 2>&1 || true
+fi
+
+function is_in () {
+    local needle="$1"
+    shift
+    local haystack=("$@")
+    for cmd in "${haystack[@]}"; do
+        if [ "$needle" == "$cmd" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+if [ "$1" == "tree" ]; then
+    echo "'suv tree' is not valid. Use 'suv run pip list' instead."
+    exit 1
+fi
+
+if [ "$1" == "pip" ] && [ "$2" == "tree" ]; then
+    echo "WARNING: 'suv pip tree' will only show local dependencies. Use 'suv run pip list' for a list including the system dependencies." >&2
+fi
+
+if [ "$1" == "pip" ] && [ "$2" == "list" ]; then
+    echo "WARNING: 'suv pip list' will only show local dependencies. Use 'suv run pip list' for a list including the system dependencies." >&2
+fi
+
+if is_in "$1" "${forbidden_cmds[@]}"; then
+    echo "'suv ${cmd}' is not possible. If you want to update the venv, you need to update the pyproject.toml, and rebuild it with 'build-lumi-venv'."
+    exit 1
+fi
+
+if ! is_in "$1" "${singularity_cmds[@]}"; then
+    uv "$@"
+    exit 0
+fi
+
+if [ ! -v VENV_NAME ] && [ -v SUV_VENV_LOCATION ]; then
+    VENV_NAME="$SUV_VENV_LOCATION/$(puv-project-env-name)"
+fi
+if [ ! -f "$VENV_NAME/venv.sqfs" ]; then
+    echo "Environment in $VENV_NAME/venv.sqfs is missing. You first need to run build-lumi-venv."
+fi
+
+if [ -f "$VENV_NAME/sif.txt" ]; then
+    sif=$(cat "$VENV_NAME/sif.txt")
+else
+    echo "No image found: ensure $VENV_NAME/sif.txt exists (built via build-lumi-venv)."
+    exit 1
+fi
+# If you want to set the cache below, you need to specify UV_CACHE_DIR first
+cache_bind=""
+cache_env=""
+if [[ -n "${UV_CACHE_DIR:-}" ]]; then
+    cache_bind=",$UV_CACHE_DIR:/uv-cache"
+    cache_env=' && export UV_CACHE_DIR="/uv-cache"'
+fi
+
+script_dir=$(cd -- "$(dirname "$0")" && pwd)
+config_bindings="$("$script_dir/puv-get-config" tool.suv.path-bindings 2>/dev/null || true)"
+if [ -n "$config_bindings" ]; then
+    # Expand env vars in bindings (e.g. $SCRATCH) before adding.
+    if command -v envsubst >/dev/null 2>&1; then
+        config_bindings=$(echo "$config_bindings" | envsubst)
+    else
+        config_bindings=$(eval "echo \"$config_bindings\"")
+    fi
+    if [ -n "${SINGULARITY_BINDPATH:-}" ]; then
+        export SINGULARITY_BINDPATH="${SINGULARITY_BINDPATH},$config_bindings"
+    else
+        export SINGULARITY_BINDPATH="$config_bindings"
+    fi
+fi
+
+WITH_SUV="export PATH="\$HOME/.local/bin:\$PATH" ${cache_env} && export UV_PROJECT_ENVIRONMENT=/user-software && export UV_LOCKED=1 && export UV_NO_SYNC=1 && export UV_NO_CACHE=1 && export UV_LINK_MODE=copy"
+
+singularity exec -B "${VENV_NAME}/venv.sqfs:/user-software:image-src=/${cache_bind}" "$sif" bash -c "$WITH_SUV && uv \"\$@\"" bash "$@"
