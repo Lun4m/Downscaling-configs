@@ -1,6 +1,6 @@
 [project]
 name = "CARRA-downscaling"
-description = "Environment for training a downscaling model on CARRA data on LUMI with AIF torch "
+description = "Environment for training a downscaling model on CARRA data on LUMI with Anemoi"
 version = "0.1.0"
 requires-python = ">=3.12, <3.13"
 
@@ -18,7 +18,8 @@ dependencies = [
     "anemoi-training",
     "anemoi-models[migrations]",
     "anemoi-graphs[tri]",
-    "anemoi-datasets[create]",
+    # Newer version of anemoi-datasets break training
+    "anemoi-datasets[create]==0.5.36",
     "anemoi-transform",
     "anemoi-registry==0.2.2",
     "anemoi-inference",
@@ -34,12 +35,14 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-# Need to specify the relative path
-anemoi-graphs = { path = "anemoi-core/graphs", editable = true }
-anemoi-models = { path = "anemoi-core/models", editable = true }
-anemoi-training = { path = "anemoi-core/training", editable = true }
-anemoi-inference = { path = "anemoi-inference", editable = true }
+# If using local versions, replace the anemoi-* packages with something similar to the following
+# Note that the path needs to be relative to the location of this file (pyproject.toml)
+# anemoi-training = { path = "../anemoi-packages/anemoi-core/training", editable = true }
 
+anemoi-training = { git = "https://github.com/ecmwf/anemoi-core", branch = "ds-collab", subdirectory = "training" }
+anemoi-models = { git = "https://github.com/ecmwf/anemoi-core", branch = "ds-collab", subdirectory = "models" }
+anemoi-graphs = { git = "https://github.com/ecmwf/anemoi-core", branch = "ds-collab", subdirectory = "graphs" }
+anemoi-inference = { git = "https://github.com/ecmwf/anemoi-inference", branch = "feat/core-c3s2-361b" }
 mlflow-export-import = { git = "https://github.com/mlflow/mlflow-export-import" }
 torch = [
   { index = "pytorch-rocm", marker = "sys_platform == 'linux' or sys_platform == 'manylinux'"},

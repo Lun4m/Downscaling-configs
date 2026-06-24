@@ -21,8 +21,8 @@ checkpoint:
 log:
   interval: 60
   mlflow:
-    project_name: 'caerra-ds'
-    experiment_name: 'caerra-ds'
+    project_name: 'downscaling_tests'
+    experiment_name: 'downscaling_tests'
     run_name: ${name}
     enabled: True
     offline: False
