@@ -96,6 +96,6 @@ sbatch --account=$PROJ \
         --job-name=my-beautiful-training \
         --nodes=8 \
         --time=02:00:00 \
-        scripts/train.sh \
+        bash/train.sh \
         carra_east.yaml
 ```
