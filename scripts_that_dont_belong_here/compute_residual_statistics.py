@@ -47,7 +47,8 @@ def finalize_stats(running_stats):
     return results
 
 
-def compute_variable_stats(variable, hres_indices, lres_indices, args):
+def compute_variable_stats(arguments: tuple):
+    (variable, hres_indices, lres_indices, args) = arguments
     total_steps = len(hres_indices)
 
     hres_dataset = open_dataset(args.hres_path)
@@ -162,18 +163,14 @@ def compute_residual_stats(args, selected_vars, hres_indices, lres_indices):
         for var in var_to_compute
     }
 
+    arguments = [(var, hres_indices, lres_indices, args) for var in var_to_compute]
+
     # Process data
     print(f"Launching {args.processes} worker(s)...")
     with Pool(processes=args.processes) as pool:
-        for var, stats in tqdm.tqdm(
-            pool.imap_unordered(
-                lambda variable: compute_variable_stats(
-                    variable, hres_indices, lres_indices, args
-                ),
-                var_to_compute,
-            ),
-            total=len(var_to_compute),
-        ):
+        imap = pool.imap_unordered(compute_variable_stats, arguments)
+
+        for var, stats in tqdm.tqdm(imap, total=len(var_to_compute)):
             running_stats[var] = stats
 
     # Merge new stats into existing stats
@@ -212,8 +209,8 @@ def main():
     parser.add_argument(
         "--output",
         type=str,
-        default="residual.nc",
-        help="Path to save .nc residual file",
+        default="residual_stats.npy",
+        help="Path to save .npy residual file",
     )
     parser.add_argument(
         "--variables",
@@ -284,7 +281,7 @@ def main():
     hres_dates = set(
         hres_dataset.dates[
             np.logical_and(
-                hres_dataset.dates > np.datetime64(args.start),
+                hres_dataset.dates >= np.datetime64(args.start),
                 hres_dataset.dates < np.datetime64(args.end),
             )
         ]
@@ -293,7 +290,7 @@ def main():
     lres_dates = set(
         lres_dataset.dates[
             np.logical_and(
-                lres_dataset.dates > np.datetime64(args.start),
+                lres_dataset.dates >= np.datetime64(args.start),
                 lres_dataset.dates < np.datetime64(args.end),
             )
         ]
@@ -321,7 +318,7 @@ def main():
         for i in range(len(common_dates))
     ]
 
-    if len(hres_indices) > len(lres_indices):
+    if len(hres_indices) != len(lres_indices):
         raise ValueError(
             "High- and low-res datasets do not have the same missing dates."
         )
