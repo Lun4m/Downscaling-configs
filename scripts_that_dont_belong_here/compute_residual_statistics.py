@@ -51,9 +51,9 @@ def compute_variable_stats(arguments: tuple):
     (variable, hres_indices, lres_indices, args) = arguments
     total_steps = len(hres_indices)
 
-    hres_dataset = open_dataset(args.hres_path)
-    lres_dataset = open_dataset(args.lres_path)
-    interp_matrix = load_npz(args.interp_matrix_path)
+    hres_dataset = open_dataset(args.hres_zarr)
+    lres_dataset = open_dataset(args.lres_zarr)
+    interp_matrix = load_npz(args.interp_matrix_npz)
 
     stats = {"mean": 0.0, "mean2": 0.0, "minimum": np.inf, "maximum": -np.inf}
 
