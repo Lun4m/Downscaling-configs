@@ -1,0 +1,33 @@
+description: Inference example script
+checkpoint: ${oc.env:SCRATCH}/experiments/carra-east/checkpoint/.../inference-last.ckpt
+
+date: 2020-01-01
+end_date: 2020-01-02
+
+input:
+  dataset: ${oc.env:SCRATCH}/anemoi-datasets/era-accumulated/caerraml-ea-an-oper-atos-n320crop2carraeast-1991-2023-3h-v2-accum.zarr
+
+output:
+  netcdf:
+    path: ${oc.env:SCRATCH}/inference/carra-east/.../out.nc
+    field_shape: [989, 789]
+    reference_date: 1970-01-01T00:00:00Z
+    projection_string: +proj=lcc +lat_0=80 +lat_1=80 +lat_2=80 +lon_0=-34 +R=6371229 +units=m +no_defs
+
+runner:
+  downscaling:
+    time_step: 3h
+
+    # Petr's optimal params
+    noise_scheduler_params:
+      sigma_max: 5000
+      sigma_min: 0.05
+      num_steps: 20
+      rho: 100
+
+    # Disable churn
+    sampler_params:
+      S_churn: 0
+      S_max: 0
+      S_min: 0
+      S_noise: 1
